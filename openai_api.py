@@ -1,49 +1,45 @@
 import os
 import openai
-import aiohttp
 from dotenv import load_dotenv
 
-# Загрузка переменных окружения, включая OpenAI API ключ и прокси URL
+# Загрузка переменных окружения
 load_dotenv()
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 PROXY_URL = os.getenv('PROXY_URL')  # Прокси-сервер
 
-# Устанавливаем API ключ
+# Устанавливаем API ключ для OpenAI
 openai.api_key = OPENAI_API_KEY
+
+# Настройка прокси через OpenAI SDK
+openai.proxy = {"http": PROXY_URL, "https": PROXY_URL}
+
 
 # Функция для взаимодействия с OpenAI API через прокси
 async def get_questions_from_openai(system: str, assistant: str, user: str):
-    url = "https://api.openai.com/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/json"
-    }
+    try:
+        # Формируем запрос к OpenAI с использованием модели gpt-4o
+        response = await openai.ChatCompletion.acreate(
+            model="gpt-4o",  # Используем новую модель gpt-4o
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "assistant", "content": assistant},
+                {"role": "user", "content": user}
+            ],
+            temperature=0.1,
+            max_tokens=500
+        )
 
-    # Формируем сообщение для OpenAI на основе ролей system, assistant и user
-    messages = [
-        {"role": "system", "content": system},
-        {"role": "assistant", "content": assistant},
-        {"role": "user", "content": user}
-    ]
+        # Возвращаем сгенерированный контент
+        return response.choices[0].message['content']
 
-    # Настраиваем payload для запроса
-    payload = {
-        "model": "gpt-4",  # Можно использовать gpt-3.5-turbo, если нужно
-        "messages": messages,
-        "temperature": 0.5,
-        "max_tokens": 500
-    }
-
-    # Создаём сессию для работы через прокси-сервер с помощью aiohttp
-    async with aiohttp.ClientSession() as session:
-        try:
-            # Делаем запрос через прокси-сервер
-            async with session.post(url, headers=headers, json=payload, proxy=PROXY_URL) as response:
-                if response.status == 200:
-                    # Парсим и возвращаем результат
-                    data = await response.json()
-                    return data["choices"][0]["message"]["content"]
-                else:
-                    return f"Ошибка при генерации вопросов: {response.status}"
-        except Exception as e:
-            return f"Произошла ошибка: {str(e)}"
+    # Обработка ошибок API
+    except openai.error.APIError as e:
+        return f"API Ошибка: {e}"
+    except openai.error.RateLimitError as e:
+        return f"Превышен лимит запросов: {e}"
+    except openai.error.AuthenticationError as e:
+        return f"Ошибка аутентификации: {e}"
+    except openai.error.InvalidRequestError as e:
+        return f"Неверный запрос: {e}"
+    except Exception as e:
+        return f"Произошла общая ошибка: {str(e)}"

@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 # Загрузка переменных окружения
 load_dotenv()
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+OPENAI_API_KEY = os.getenv('GPT_SECRET_KEY')
 PROXY_URL = os.getenv('PROXY_URL')  # Прокси-сервер
 
 # Устанавливаем API ключ для OpenAI

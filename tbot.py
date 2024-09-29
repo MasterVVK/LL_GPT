@@ -10,7 +10,7 @@ load_dotenv()
 # токен бота
 TOKEN = os.getenv('TG_TOKEN')
 
-is_open_buttons =  ["Открытые вопросы", "Закрытые вопросы"]
+is_open_buttons = ["Открытые вопросы", "Закрытые вопросы"]
 prof_buttons = Promt.params_dict["prof"]
 technology_buttons = Promt.params_dict["technology"]
 level_buttons = Promt.params_dict["level"]

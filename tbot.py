@@ -28,20 +28,21 @@ async def start(update: Update, context: CallbackContext):
     await update.message.reply_text('Выберите тип вопросов:', reply_markup=reply_markup)
 
 # Функция для обработки нажатий кнопок
+# Функция для обработки нажатий кнопок
 async def button(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
 
-    # Тип вопросов
+    # Тип вопросов (открытые или закрытые)
     if query.data in is_open_buttons:
-        context.user_data['params'] = f'{query.data}'
+        context.user_data['is_open'] = query.data  # Сохраняем тип вопроса (открытый или закрытый)
         reply_markup = create_buttons(prof_buttons)  # специальность
         await query.edit_message_text(text=f"Вы выбрали: {query.data}. Теперь выберите профессию:", reply_markup=reply_markup)
 
     # специальность
     elif query.data in prof_buttons:
+        context.user_data['prof'] = query.data  # Сохраняем профессию
         if query.data == "Разработчик":
-            context.user_data['params'] += f', {query.data}'
             reply_markup = create_buttons(technology_buttons)  # технологии
             await query.edit_message_text(text=f"Вы выбрали: {query.data}. Теперь выберите технологию:", reply_markup=reply_markup)
         else:
@@ -49,18 +50,24 @@ async def button(update: Update, context: CallbackContext):
 
     # технологии
     elif query.data in technology_buttons:
-        context.user_data['params'] += f', {query.data}'
+        context.user_data['technology'] = query.data  # Сохраняем технологию
         reply_markup = create_buttons(level_buttons)  # уровни
-        await query.edit_message_text(text=f"Ваш выбор: {query.data}.", reply_markup=reply_markup)
+        await query.edit_message_text(text=f"Вы выбрали технологию: {query.data}. Теперь выберите уровень:", reply_markup=reply_markup)
 
     # уровни
     elif query.data in level_buttons:
-        context.user_data['params'] += f', {query.data}'
-        await query.edit_message_text(text=f"Ваш выбор: {context.user_data['params']}. Генерирую вопросы...")
+        context.user_data['level'] = query.data  # Сохраняем уровень
+        await query.edit_message_text(text=f"Ваш выбор: {context.user_data}. Генерирую вопросы...")
 
-        # Вызов функции для генерации вопросов через OpenAI
-        questions = await get_questions_from_openai(context.user_data['params'])
+        # Формируем сообщения для system, assistant, user
+        system_prompt = f"Ты нейро-экзаменатор. Генерируй вопросы для {context.user_data['prof']} на уровне {context.user_data['level']} по технологии {context.user_data['technology']}."
+        assistant_prompt = "Генерируй список вопросов."
+        user_prompt = f"Пользователь выбрал {context.user_data['is_open']} вопросы."
+
+        # Вызов функции для генерации вопросов через OpenAI с правильными аргументами
+        questions = await get_questions_from_openai(system_prompt, assistant_prompt, user_prompt)
         await query.edit_message_text(text=f"Сгенерированные вопросы:\n{questions}")
+
 
 # Основная функция
 def main() -> None:

@@ -13,12 +13,11 @@ openai.api_key = OPENAI_API_KEY
 # Настройка прокси через OpenAI SDK
 openai.proxy = {"http": PROXY_URL, "https": PROXY_URL}
 
-
 # Функция для взаимодействия с OpenAI API через прокси
 async def get_questions_from_openai(system: str, assistant: str, user: str):
     try:
-        # Формируем запрос к OpenAI с использованием модели gpt-4o
-        response = await openai.ChatCompletion.acreate(
+        # Используем новый метод из OpenAI API (новая версия библиотеки)
+        response = openai.chat.create(
             model="gpt-4o",  # Используем новую модель gpt-4o
             messages=[
                 {"role": "system", "content": system},
@@ -30,7 +29,7 @@ async def get_questions_from_openai(system: str, assistant: str, user: str):
         )
 
         # Возвращаем сгенерированный контент
-        return response.choices[0].message['content']
+        return response.choices[0]['message']['content']
 
     # Обработка ошибок API
     except openai.error.APIError as e:

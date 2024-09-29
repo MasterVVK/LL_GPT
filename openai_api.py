@@ -16,9 +16,9 @@ openai.proxy = {"http": PROXY_URL, "https": PROXY_URL}
 # Функция для взаимодействия с OpenAI API через прокси
 async def get_questions_from_openai(system: str, assistant: str, user: str):
     try:
-        # Используем новый метод из OpenAI API (новая версия библиотеки)
-        response = openai.chat.create(
-            model="gpt-4o",  # Используем новую модель gpt-4o
+        # Используем метод ChatCompletion из новой версии библиотеки
+        response = openai.ChatCompletion.create(
+            model="gpt-4o",  # Используем модель gpt-4o
             messages=[
                 {"role": "system", "content": system},
                 {"role": "assistant", "content": assistant},
@@ -31,14 +31,8 @@ async def get_questions_from_openai(system: str, assistant: str, user: str):
         # Возвращаем сгенерированный контент
         return response.choices[0]['message']['content']
 
-    # Обработка ошибок API
-    except openai.error.APIError as e:
+    # Обработка ошибок
+    except openai.error.OpenAIError as e:
         return f"API Ошибка: {e}"
-    except openai.error.RateLimitError as e:
-        return f"Превышен лимит запросов: {e}"
-    except openai.error.AuthenticationError as e:
-        return f"Ошибка аутентификации: {e}"
-    except openai.error.InvalidRequestError as e:
-        return f"Неверный запрос: {e}"
     except Exception as e:
         return f"Произошла общая ошибка: {str(e)}"

@@ -1,3 +1,4 @@
+import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, CallbackContext
 from dotenv import load_dotenv
@@ -15,6 +16,9 @@ prof_buttons = Promt.params_dict["prof"]
 technology_buttons = Promt.params_dict["technology"]
 level_buttons = Promt.params_dict["level"]
 
+# Путь к папке с промптами
+PROMPTS_DIR = "fastapi/Promts/"
+
 # Функция для создания кнопок
 def create_buttons(data_list):
     keyboard = []
@@ -22,12 +26,28 @@ def create_buttons(data_list):
         keyboard.append([InlineKeyboardButton(item, callback_data=item)])
     return InlineKeyboardMarkup(keyboard)
 
+# Функция для загрузки и редактирования промпта из файла
+def load_and_edit_prompt(file_name, context_data):
+    file_path = os.path.join(PROMPTS_DIR, file_name)
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            prompt_content = file.read()
+
+        # Заменяем плейсхолдеры в промпте на реальные данные
+        prompt_content = prompt_content.replace("{prof}", context_data.get("prof", ""))
+        prompt_content = prompt_content.replace("{technology}", context_data.get("technology", ""))
+        prompt_content = prompt_content.replace("{level}", context_data.get("level", ""))
+        prompt_content = prompt_content.replace("{question_type}", context_data.get("is_open", "").lower())
+
+        return prompt_content
+    except FileNotFoundError:
+        return f"Файл {file_name} не найден."
+
 # Функция для отображения первого набора кнопок
 async def start(update: Update, context: CallbackContext):
     reply_markup = create_buttons(is_open_buttons)
     await update.message.reply_text('Выберите тип вопросов:', reply_markup=reply_markup)
 
-# Функция для обработки нажатий кнопок
 # Функция для обработки нажатий кнопок
 async def button(update: Update, context: CallbackContext):
     query = update.callback_query
@@ -59,15 +79,14 @@ async def button(update: Update, context: CallbackContext):
         context.user_data['level'] = query.data  # Сохраняем уровень
         await query.edit_message_text(text=f"Ваш выбор: {context.user_data}. Генерирую вопросы...")
 
-        # Формируем сообщения для system, assistant, user
-        system_prompt = f"Ты нейро-экзаменатор. Генерируй вопросы для {context.user_data['prof']} на уровне {context.user_data['level']} по технологии {context.user_data['technology']}."
-        assistant_prompt = "Генерируй список вопросов."
-        user_prompt = f"Пользователь выбрал {context.user_data['is_open']} вопросы."
+        # Загружаем и редактируем промпты для system, assistant, user
+        system_prompt = load_and_edit_prompt("promt_system.txt", context.user_data)
+        assistant_prompt = load_and_edit_prompt("promt_assistant.txt", context.user_data)
+        user_prompt = load_and_edit_prompt("promt_user.txt", context.user_data)
 
-        # Вызов функции для генерации вопросов через OpenAI с правильными аргументами
+        # Вызов функции для генерации вопросов через OpenAI
         questions = await get_questions_from_openai(system_prompt, assistant_prompt, user_prompt)
         await query.edit_message_text(text=f"Сгенерированные вопросы:\n{questions}")
-
 
 # Основная функция
 def main() -> None:

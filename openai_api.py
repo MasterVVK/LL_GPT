@@ -1,23 +1,24 @@
 import os
-import openai
+from openai import AsyncOpenAI, APIError, APIConnectionError, RateLimitError, AuthenticationError
 from dotenv import load_dotenv
+import httpx
 
 # Загрузка переменных окружения
 load_dotenv()
 OPENAI_API_KEY = os.getenv('GPT_SECRET_KEY')
 PROXY_URL = os.getenv('PROXY_URL')  # Прокси-сервер
 
-# Устанавливаем API ключ для OpenAI
-openai.api_key = OPENAI_API_KEY
+# Создаем кастомный HTTP-клиент с поддержкой прокси
+http_client = httpx.AsyncClient(proxies=PROXY_URL)
 
-# Настройка прокси через OpenAI SDK
-openai.proxy = {"http": PROXY_URL, "https": PROXY_URL}
+# Инициализация асинхронного клиента OpenAI с кастомным HTTP-клиентом
+client = AsyncOpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
 
 # Функция для взаимодействия с OpenAI API через прокси
 async def get_questions_from_openai(system: str, assistant: str, user: str):
     try:
-        # Используем метод ChatCompletion из новой версии библиотеки
-        response = openai.ChatCompletion.create(
+        # Используем новый метод chat.completions.create с асинхронным клиентом
+        response = await client.chat.completions.create(
             model="gpt-4o",  # Используем модель gpt-4o
             messages=[
                 {"role": "system", "content": system},
@@ -29,10 +30,20 @@ async def get_questions_from_openai(system: str, assistant: str, user: str):
         )
 
         # Возвращаем сгенерированный контент
-        return response.choices[0]['message']['content']
+        return response.choices[0].message.content
 
-    # Обработка ошибок
-    except openai.error.OpenAIError as e:
+    # Обработка исключений API
+    except APIError as e:
         return f"API Ошибка: {e}"
+    except RateLimitError as e:
+        return f"Превышен лимит запросов: {e}"
+    except AuthenticationError as e:
+        return f"Ошибка аутентификации: {e}"
+    except APIConnectionError as e:
+        return f"Ошибка соединения: {e}"
     except Exception as e:
         return f"Произошла общая ошибка: {str(e)}"
+
+# Не забывайте закрывать асинхронный HTTP-клиент после работы
+async def close_http_client():
+    await http_client.aclose()

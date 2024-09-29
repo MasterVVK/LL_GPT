@@ -1,25 +1,25 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, Updater, CommandHandler, CallbackQueryHandler, CallbackContext, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, CallbackContext
 from dotenv import load_dotenv
 from promts import Promt
 import os
+from openai_api import get_questions_from_openai  # Импорт функции из openai_api.py
 
-# подгружаем переменные окружения
+# Загрузка переменных окружения
 load_dotenv()
-
-# токен бота
 TOKEN = os.getenv('TG_TOKEN')
 
+# Опции для выбора в боте
 is_open_buttons = ["Открытые вопросы", "Закрытые вопросы"]
 prof_buttons = Promt.params_dict["prof"]
 technology_buttons = Promt.params_dict["technology"]
 level_buttons = Promt.params_dict["level"]
 
-
+# Функция для создания кнопок
 def create_buttons(data_list):
     keyboard = []
     for item in data_list:
-        keyboard.append([InlineKeyboardButton(item, callback_data=item)])  
+        keyboard.append([InlineKeyboardButton(item, callback_data=item)])
     return InlineKeyboardMarkup(keyboard)
 
 # Функция для отображения первого набора кнопок
@@ -34,49 +34,44 @@ async def button(update: Update, context: CallbackContext):
 
     # Тип вопросов
     if query.data in is_open_buttons:
-        context.user_data['params'] = f'{query.data}'  
-        reply_markup = create_buttons(prof_buttons) #специальность
+        context.user_data['params'] = f'{query.data}'
+        reply_markup = create_buttons(prof_buttons)  # специальность
         await query.edit_message_text(text=f"Вы выбрали: {query.data}. Теперь выберите профессию:", reply_markup=reply_markup)
 
     # специальность
     elif query.data in prof_buttons:
         if query.data == "Разработчик":
-            context.user_data['params'] += f', {query.data}' 
-            reply_markup = create_buttons(technology_buttons) # технологии 
-            await query.edit_message_text(text=f"Вы выбрали: {query.data}. Теперь выберете технологию:", reply_markup=reply_markup)
-        else: 
+            context.user_data['params'] += f', {query.data}'
+            reply_markup = create_buttons(technology_buttons)  # технологии
+            await query.edit_message_text(text=f"Вы выбрали: {query.data}. Теперь выберите технологию:", reply_markup=reply_markup)
+        else:
             await query.edit_message_text(text=f"Специальность: {query.data} пока в разработке")
-             
-    # технологии         
-    elif query.data in technology_buttons:    
-        context.user_data['params'] += f', {query.data}' 
-        reply_markup = create_buttons(level_buttons) # технологии   
+
+    # технологии
+    elif query.data in technology_buttons:
+        context.user_data['params'] += f', {query.data}'
+        reply_markup = create_buttons(level_buttons)  # уровни
         await query.edit_message_text(text=f"Ваш выбор: {query.data}.", reply_markup=reply_markup)
-                
+
     # уровни
-    elif query.data in level_buttons:    
-        context.user_data['params'] += f', {query.data}'  
-        await query.edit_message_text(text=f"Ваш выбор: {context.user_data['params']}", reply_markup="")    
+    elif query.data in level_buttons:
+        context.user_data['params'] += f', {query.data}'
+        await query.edit_message_text(text=f"Ваш выбор: {context.user_data['params']}. Генерирую вопросы...")
 
-    await query.answer()  
-      
-  
+        # Вызов функции для генерации вопросов через OpenAI
+        questions = await get_questions_from_openai(context.user_data['params'])
+        await query.edit_message_text(text=f"Сгенерированные вопросы:\n{questions}")
 
-    
 # Основная функция
 def main() -> None:
- 
-  # создаем приложение и передаем в него токен
+    # создаем приложение и передаем в него токен
     application = Application.builder().token(TOKEN).build()
-    print('Бот запущен...')
-
 
     # Регистрируем обработчики команд и кнопок
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button))
-    
+
     application.run_polling()
-    print('Бот остановлен')
 
 if __name__ == '__main__':
     main()

@@ -3,8 +3,8 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, CallbackContext
 from dotenv import load_dotenv
 from promts import Promt
-from openai_api import get_questions_from_openai  # Импорт функции из openai_api.py
-from database import create_connection, add_user, create_tables, fill_base_tables  # Импорт функций для работы с БД
+from database import create_connection, add_user, create_tables, fill_base_tables
+from question_handler import generate_and_send_questions, handle_evaluation  # Импорт функций из question_handler.py
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -19,32 +19,12 @@ prof_buttons = Promt.params_dict["prof"]
 technology_buttons = Promt.params_dict["technology"]
 level_buttons = Promt.params_dict["level"]
 
-# Путь к папке с промптами
-PROMPTS_DIR = "fastapi/Promts/"
-
 # Функция для создания кнопок
 def create_buttons(data_list):
     keyboard = []
     for item in data_list:
         keyboard.append([InlineKeyboardButton(item, callback_data=item)])
     return InlineKeyboardMarkup(keyboard)
-
-# Функция для загрузки и редактирования промпта из файла
-def load_and_edit_prompt(file_name, context_data):
-    file_path = os.path.join(PROMPTS_DIR, file_name)
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            prompt_content = file.read()
-
-        # Заменяем плейсхолдеры в промпте на реальные данные
-        prompt_content = prompt_content.replace("{prof}", context_data.get("prof", ""))
-        prompt_content = prompt_content.replace("{technology}", context_data.get("technology", ""))
-        prompt_content = prompt_content.replace("{level}", context_data.get("level", ""))
-        prompt_content = prompt_content.replace("{question_type}", context_data.get("is_open", "").lower())
-
-        return prompt_content
-    except FileNotFoundError:
-        return f"Файл {file_name} не найден."
 
 # Функция для обработки команды /start
 async def start(update: Update, context: CallbackContext):
@@ -95,14 +75,8 @@ async def button(update: Update, context: CallbackContext):
         context.user_data['level'] = query.data  # Сохраняем уровень
         await query.edit_message_text(text=f"Ваш выбор: {context.user_data}. Генерирую вопросы...")
 
-        # Загружаем и редактируем промпты для system, assistant, user
-        system_prompt = load_and_edit_prompt("promt_system.txt", context.user_data)
-        assistant_prompt = load_and_edit_prompt("promt_assistant.txt", context.user_data)
-        user_prompt = load_and_edit_prompt("promt_user.txt", context.user_data)
-
-        # Вызов функции для генерации вопросов через OpenAI
-        questions = await get_questions_from_openai(system_prompt, assistant_prompt, user_prompt)
-        await query.edit_message_text(text=f"Сгенерированные вопросы:\n{questions}")
+        # Вызов функции для генерации и отправки вопросов
+        await generate_and_send_questions(update, context)
 
 # Основная функция
 def main() -> None:
@@ -118,7 +92,8 @@ def main() -> None:
 
     # Регистрируем обработчики команд и кнопок
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button))
+    application.add_handler(CallbackQueryHandler(button))  # Обрабатывает выборы кнопок
+    application.add_handler(CallbackQueryHandler(handle_evaluation))  # Обрабатывает оценку вопросов
 
     application.run_polling()
 

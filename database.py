@@ -140,16 +140,29 @@ def fill_base_tables(conn):
 
 # Функция для добавления нового пользователя
 def add_user(conn, telegram_id, name, email):
-    """Добавление нового пользователя в базу данных"""
+    """Добавление нового пользователя в базу данных или обновление существующего"""
     try:
-        sql = '''INSERT INTO users(telegram_id, name, email)
-                 VALUES(?, ?, ?)'''
         cursor = conn.cursor()
-        cursor.execute(sql, (telegram_id, name, email))
+
+        # Проверяем, существует ли пользователь с таким telegram_id
+        cursor.execute("SELECT id FROM users WHERE telegram_id = ?", (telegram_id,))
+        result = cursor.fetchone()
+
+        if result:
+            # Пользователь уже существует, можно обновить данные, если нужно
+            print(f"Пользователь с telegram_id {telegram_id} уже существует. Обновление информации.")
+            sql = '''UPDATE users SET name = ?, email = ? WHERE telegram_id = ?'''
+            cursor.execute(sql, (name, email, telegram_id))
+        else:
+            # Добавляем нового пользователя
+            sql = '''INSERT INTO users(telegram_id, name, email)
+                     VALUES(?, ?, ?)'''
+            cursor.execute(sql, (telegram_id, name, email))
+
         conn.commit()
         return cursor.lastrowid
     except Error as e:
-        print(f"Ошибка при добавлении пользователя: {e}")
+        print(f"Ошибка при добавлении или обновлении пользователя: {e}")
 
 # Функция для добавления нового вопроса
 def add_question(conn, question_text, question_type_id, technology_id, difficulty_id):

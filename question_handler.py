@@ -10,13 +10,17 @@ async def send_next_question(update, context):
 
     # Проверяем, были ли все вопросы заданы
     if current_question_index >= len(questions):
-        await update.message.reply_text("Все вопросы были заданы!")
+        # Проверяем, был ли это callback-запрос или команда
+        message = update.callback_query.message if update.callback_query else update.message
+        await message.reply_text("Все вопросы были заданы!")
         return
 
     # Отправляем следующий вопрос
     question = questions[current_question_index].strip()
     if question:
-        await update.message.reply_text(f"Вопрос {current_question_index + 1}: {question}\nОцените этот вопрос от 1 до 5:")
+        # Проверяем, был ли это callback-запрос или команда
+        message = update.callback_query.message if update.callback_query else update.message
+        await message.reply_text(f"Вопрос {current_question_index + 1}: {question}\nОцените этот вопрос от 1 до 5:")
 
         # Кнопки для оценки
         reply_markup = InlineKeyboardMarkup([
@@ -27,7 +31,7 @@ async def send_next_question(update, context):
             [InlineKeyboardButton("5", callback_data='5')]
         ])
 
-        await update.message.reply_text("Оцените этот вопрос:", reply_markup=reply_markup)
+        await message.reply_text("Оцените этот вопрос:", reply_markup=reply_markup)
 
 # Функция для генерации вопросов и отправки их пользователю
 async def generate_and_send_questions(update, context):

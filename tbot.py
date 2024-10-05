@@ -1,14 +1,17 @@
-import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, CallbackContext
 from dotenv import load_dotenv
 from promts import Promt
 import os
 from openai_api import get_questions_from_openai  # Импорт функции из openai_api.py
+from database import create_connection, add_user, create_tables  # Импорт функций для работы с БД
 
 # Загрузка переменных окружения
 load_dotenv()
 TOKEN = os.getenv('TG_TOKEN')
+
+# Путь к базе данных
+DATABASE_PATH = "project_database.db"
 
 # Опции для выбора в боте
 is_open_buttons = ["Открытые вопросы", "Закрытые вопросы"]
@@ -43,8 +46,22 @@ def load_and_edit_prompt(file_name, context_data):
     except FileNotFoundError:
         return f"Файл {file_name} не найден."
 
-# Функция для отображения первого набора кнопок
+# Функция для обработки команды /start
 async def start(update: Update, context: CallbackContext):
+    # Подключение к базе данных
+    conn = create_connection(DATABASE_PATH)
+    if conn is not None:
+        create_tables(conn)  # Убедимся, что все таблицы созданы
+
+        # Получаем информацию о пользователе
+        user_id = update.effective_user.id
+        username = update.effective_user.full_name
+        email = ""  # Email может быть добавлен, если он доступен
+
+        # Добавляем пользователя в базу данных
+        add_user(conn, telegram_id=str(user_id), name=username, email=email)
+        conn.close()
+
     reply_markup = create_buttons(is_open_buttons)
     await update.message.reply_text('Выберите тип вопросов:', reply_markup=reply_markup)
 

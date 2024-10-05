@@ -29,6 +29,9 @@ def create_buttons(data_list, prefix=""):
 
 # Функция для обработки команды /start
 async def start(update: Update, context: CallbackContext):
+    # Очищаем данные пользователя при повторном вызове /start
+    context.user_data.clear()
+
     # Подключение к базе данных
     conn = create_connection(DATABASE_PATH)
 

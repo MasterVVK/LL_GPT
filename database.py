@@ -1,6 +1,5 @@
 import sqlite3
 from sqlite3 import Error
-import os
 
 # Функция для создания подключения к базе данных SQLite
 def create_connection(db_file):

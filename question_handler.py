@@ -2,6 +2,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from database import add_question, add_assessment
 from openai_api import get_questions_from_openai
 
+
 # Функция для отправки следующего вопроса
 async def send_next_question(update, context):
     """Отправляем следующий вопрос пользователю"""
@@ -33,10 +34,11 @@ async def send_next_question(update, context):
 
         await message.reply_text("Оцените этот вопрос:", reply_markup=reply_markup)
 
+
 # Функция для генерации вопросов и отправки их пользователю
 async def generate_and_send_questions(update, context):
     """Генерация вопросов через OpenAI и отправка их пользователю"""
-    system_prompt = f"Ты нейро-экзаменатор. Твоя задача — подготовить {context.user_data['is_open']} вопросы для {context.user_data['prof']} уровня {context.user_data['level']} по технологии {context.user_data['technology']}."
+    system_prompt = f"Ты экзаменатор на собеседовании. Твоя задача — подготовить вопросы для собеседования на позицию {context.user_data['prof']} с уровнем {context.user_data['level']} по технологии {context.user_data['technology']}."
 
     assistant_prompt = "Генерируй список вопросов."
     user_prompt = f"Пользователь выбрал {context.user_data['is_open']} вопросы."
@@ -44,11 +46,18 @@ async def generate_and_send_questions(update, context):
     # Вызов функции для генерации вопросов через OpenAI
     questions = await get_questions_from_openai(system_prompt, assistant_prompt, user_prompt)
 
-    # Разбиваем полученный текст на вопросы, начиная с ключевого слова "Вопрос:"
-    context.user_data['questions'] = [q.strip() for q in questions.split("\n") if q.startswith("Вопрос:")]
+    # Разбиваем полученный текст на строки, считая каждую строку отдельным вопросом
+    context.user_data['questions'] = [q.strip() for q in questions.split("\n") if q.strip()]
+
+    # Проверяем, были ли сгенерированы вопросы
+    if not context.user_data['questions']:
+        await update.message.reply_text("Не удалось сгенерировать вопросы. Попробуйте снова.")
+        return
+
     context.user_data['current_question'] = 0  # Индекс текущего вопроса
     context.user_data['evaluations'] = []  # Список для хранения оценок
     await send_next_question(update, context)
+
 
 # Функция для обработки оценки
 async def handle_evaluation(update, context):
@@ -72,6 +81,7 @@ async def handle_evaluation(update, context):
     # Устанавливаем состояние ожидания комментария
     context.user_data['awaiting_comment'] = True  # Флаг для отслеживания состояния комментария
 
+
 # Функция для обработки комментария
 async def handle_comment(update, context):
     """Обрабатываем комментарий и переходим к следующему вопросу"""
@@ -94,6 +104,7 @@ async def handle_comment(update, context):
     else:
         await update.message.reply_text("Оцените вопрос перед добавлением комментария.")
 
+
 # Функция для сохранения данных в базу
 async def save_evaluation_to_db(update, context):
     """Сохраняем текущий вопрос, оценку и комментарий в базу данных"""
@@ -108,7 +119,8 @@ async def save_evaluation_to_db(update, context):
         difficulty_id = context.user_data['level']
 
         # Сохраняем вопрос и его оценку в базу данных
-        question_id = add_question(update.effective_user.id, question_text, question_type_id, technology_id, difficulty_id)
+        question_id = add_question(update.effective_user.id, question_text, question_type_id, technology_id,
+                                   difficulty_id)
         add_assessment(update.effective_user.id, question_id, rating, comment)
     except Exception as e:
         # Логируем ошибку и передаем ее в интерфейс

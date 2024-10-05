@@ -8,13 +8,16 @@ async def send_next_question(update, context):
     questions = context.user_data.get('questions', [])
     current_question_index = context.user_data.get('current_question', 0)
 
+    # Проверяем, был ли это callback-запрос или команда
+    message = update.callback_query.message if update.callback_query else update.message
+
     if current_question_index >= len(questions):
-        await update.callback_query.message.reply_text("Все вопросы были заданы!")
+        await message.reply_text("Все вопросы были заданы!")
         return
 
     question = questions[current_question_index].strip()
     if question:
-        await update.callback_query.message.reply_text(f"Вопрос {current_question_index + 1}: {question}\nОцените этот вопрос от 1 до 5:")
+        await message.reply_text(f"Вопрос {current_question_index + 1}: {question}\nОцените этот вопрос от 1 до 5:")
 
         reply_markup = InlineKeyboardMarkup([
             [InlineKeyboardButton("1", callback_data='1')],
@@ -24,7 +27,7 @@ async def send_next_question(update, context):
             [InlineKeyboardButton("5", callback_data='5')]
         ])
 
-        await update.callback_query.message.reply_text("Оцените этот вопрос:", reply_markup=reply_markup)
+        await message.reply_text("Оцените этот вопрос:", reply_markup=reply_markup)
 
 # Функция для генерации вопросов и отправки их пользователю
 async def generate_and_send_questions(update, context):
@@ -41,6 +44,8 @@ async def generate_and_send_questions(update, context):
     context.user_data['questions'] = [q.strip() for q in questions.split("\n") if q.startswith("Вопрос:")]
     context.user_data['current_question'] = 0  # Индекс текущего вопроса
     context.user_data['evaluations'] = []  # Список для хранения оценок
+    print(system_prompt)
+    print(questions)
     await send_next_question(update, context)
 
 # Функция для обработки оценки

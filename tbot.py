@@ -1,10 +1,10 @@
+import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, CallbackContext
 from dotenv import load_dotenv
 from promts import Promt
-import os
 from openai_api import get_questions_from_openai  # Импорт функции из openai_api.py
-from database import create_connection, add_user, create_tables  # Импорт функций для работы с БД
+from database import create_connection, add_user, create_tables, fill_base_tables  # Импорт функций для работы с БД
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -50,9 +50,8 @@ def load_and_edit_prompt(file_name, context_data):
 async def start(update: Update, context: CallbackContext):
     # Подключение к базе данных
     conn = create_connection(DATABASE_PATH)
-    if conn is not None:
-        create_tables(conn)  # Убедимся, что все таблицы созданы
 
+    if conn is not None:
         # Получаем информацию о пользователе
         user_id = update.effective_user.id
         username = update.effective_user.full_name
@@ -109,6 +108,13 @@ async def button(update: Update, context: CallbackContext):
 def main() -> None:
     # создаем приложение и передаем в него токен
     application = Application.builder().token(TOKEN).build()
+
+    # Подключение к базе данных и заполнение таблиц при старте бота
+    conn = create_connection(DATABASE_PATH)
+    if conn is not None:
+        create_tables(conn)  # Создаем таблицы, если их нет
+        fill_base_tables(conn)  # Заполняем таблицы данными
+        conn.close()
 
     # Регистрируем обработчики команд и кнопок
     application.add_handler(CommandHandler("start", start))

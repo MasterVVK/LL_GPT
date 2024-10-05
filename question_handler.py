@@ -1,6 +1,10 @@
+import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from database import add_question, add_assessment
 from openai_api import get_questions_from_openai
+
+# Устанавливаем уровень логирования для вывода в консоль
+logging.basicConfig(level=logging.INFO)
 
 
 # Функция для отправки следующего вопроса
@@ -14,6 +18,7 @@ async def send_next_question(update, context):
         # Проверяем, был ли это callback-запрос или команда
         message = update.callback_query.message if update.callback_query else update.message
         await message.reply_text("Все вопросы были заданы!")
+        logging.info("Все вопросы были заданы.")
         return
 
     # Отправляем следующий вопрос
@@ -22,6 +27,9 @@ async def send_next_question(update, context):
         # Проверяем, был ли это callback-запрос или команда
         message = update.callback_query.message if update.callback_query else update.message
         await message.reply_text(f"Вопрос {current_question_index + 1}: {question}\nОцените этот вопрос от 1 до 5:")
+
+        # Логируем отправку вопроса
+        logging.info(f"Отправлен вопрос {current_question_index + 1}: {question}")
 
         # Кнопки для оценки
         reply_markup = InlineKeyboardMarkup([
@@ -52,6 +60,7 @@ async def generate_and_send_questions(update, context):
     # Проверяем, были ли сгенерированы вопросы
     if not context.user_data['questions']:
         await update.message.reply_text("Не удалось сгенерировать вопросы. Попробуйте снова.")
+        logging.info("Не удалось сгенерировать вопросы.")
         return
 
     context.user_data['current_question'] = 0  # Индекс текущего вопроса
@@ -68,18 +77,27 @@ async def handle_evaluation(update, context):
     # Получаем оценку пользователя
     rating = int(query.data)
 
+    # Логируем информацию о нажатой кнопке
+    logging.info(f"Нажата кнопка: {rating}")
+
     # Сохраняем оценку для текущего вопроса
     current_question_index = context.user_data.get('current_question', 0)
+    logging.info(f"Текущий вопрос: {current_question_index}")
+
     context.user_data['evaluations'].append({
         'question': context.user_data['questions'][current_question_index],
         'rating': rating
     })
 
+    # Логируем переход к запросу комментария
+    logging.info("Запрашиваем комментарий от пользователя.")
+
     # Переходим к запросу комментария
     await query.message.reply_text("Пожалуйста, введите комментарий к этому вопросу:")
 
     # Устанавливаем состояние ожидания комментария
-    context.user_data['awaiting_comment'] = True  # Флаг для отслеживания состояния комментария
+    context.user_data['awaiting_comment'] = True
+    logging.info("Ожидание комментария от пользователя установлено.")
 
 
 # Функция для обработки комментария
@@ -89,19 +107,30 @@ async def handle_comment(update, context):
         # Получаем комментарий от пользователя
         comment = update.message.text
 
+        # Логируем полученный комментарий
+        logging.info(f"Комментарий пользователя: {comment}")
+
         # Сохраняем комментарий для текущего вопроса
         current_question_index = context.user_data.get('current_question', 0)
         context.user_data['evaluations'][-1]['comment'] = comment
 
         # Попробуем сохранить оценку и комментарий в базу данных
         try:
+            logging.info(f"Сохраняем данные для вопроса {current_question_index}")
             await save_evaluation_to_db(update, context)
-            context.user_data['current_question'] += 1  # Переходим к следующему вопросу
+
+            # Переходим к следующему вопросу
+            context.user_data['current_question'] += 1
+            logging.info(
+                f"Переход к следующему вопросу. Текущий индекс вопроса: {context.user_data['current_question']}")
+
             context.user_data['awaiting_comment'] = False  # Сбрасываем флаг комментария
             await send_next_question(update, context)  # Отправляем следующий вопрос
         except Exception as e:
+            logging.error(f"Ошибка при сохранении данных: {str(e)}")
             await update.message.reply_text(f"Ошибка при сохранении данных: {str(e)}")
     else:
+        logging.info("Не удалось получить комментарий, поскольку оценка вопроса не была сделана.")
         await update.message.reply_text("Оцените вопрос перед добавлением комментария.")
 
 
@@ -122,6 +151,11 @@ async def save_evaluation_to_db(update, context):
         question_id = add_question(update.effective_user.id, question_text, question_type_id, technology_id,
                                    difficulty_id)
         add_assessment(update.effective_user.id, question_id, rating, comment)
+
+        # Логируем успешное сохранение данных
+        logging.info(f"Данные для вопроса {current_question_index} успешно сохранены.")
+
     except Exception as e:
         # Логируем ошибку и передаем ее в интерфейс
+        logging.error(f"Не удалось сохранить оценку и комментарий: {str(e)}")
         raise Exception(f"Не удалось сохранить оценку и комментарий: {str(e)}")

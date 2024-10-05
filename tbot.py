@@ -4,7 +4,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 from dotenv import load_dotenv
 from promts import Promt
 from database import create_connection, add_user, create_tables, fill_base_tables
-from question_handler import generate_and_send_questions, handle_evaluation, handle_comment  # Импорт функций из question_handler.py
+from question_handler import generate_and_send_questions, handle_evaluation, handle_comment
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -20,10 +20,11 @@ technology_buttons = Promt.params_dict["technology"]
 level_buttons = Promt.params_dict["level"]
 
 # Функция для создания кнопок
-def create_buttons(data_list):
+def create_buttons(data_list, prefix=""):
     keyboard = []
     for item in data_list:
-        keyboard.append([InlineKeyboardButton(item, callback_data=item)])
+        callback_data = f"{prefix}{item}"  # Добавляем префикс к callback_data
+        keyboard.append([InlineKeyboardButton(item, callback_data=callback_data)])
     return InlineKeyboardMarkup(keyboard)
 
 # Функция для обработки команды /start
@@ -41,7 +42,7 @@ async def start(update: Update, context: CallbackContext):
         add_user(conn, telegram_id=str(user_id), name=username, email=email)
         conn.close()
 
-    reply_markup = create_buttons(is_open_buttons)
+    reply_markup = create_buttons(is_open_buttons, "open_")
     await update.message.reply_text('Выберите тип вопросов:', reply_markup=reply_markup)
 
 # Функция для обработки нажатий кнопок
@@ -49,30 +50,31 @@ async def button(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
 
-    # Тип вопросов (открытые или закрытые)
-    if query.data in is_open_buttons:
-        context.user_data['is_open'] = query.data  # Сохраняем тип вопроса (открытый или закрытый)
-        reply_markup = create_buttons(prof_buttons)  # специальность
-        await query.edit_message_text(text=f"Вы выбрали: {query.data}. Теперь выберите профессию:", reply_markup=reply_markup)
+    # Определяем, какой тип данных был отправлен (префиксы)
+    if query.data.startswith("open_"):
+        query_data = query.data[5:]  # Убираем префикс "open_"
+        context.user_data['is_open'] = query_data  # Сохраняем тип вопроса
+        reply_markup = create_buttons(prof_buttons, "prof_")  # специальность
+        await query.edit_message_text(text=f"Вы выбрали: {query_data}. Теперь выберите профессию:", reply_markup=reply_markup)
 
-    # специальность
-    elif query.data in prof_buttons:
-        context.user_data['prof'] = query.data  # Сохраняем профессию
-        if query.data == "Разработчик":
-            reply_markup = create_buttons(technology_buttons)  # технологии
-            await query.edit_message_text(text=f"Вы выбрали: {query.data}. Теперь выберите технологию:", reply_markup=reply_markup)
+    elif query.data.startswith("prof_"):
+        query_data = query.data[5:]
+        context.user_data['prof'] = query_data  # Сохраняем профессию
+        if query_data == "Разработчик":
+            reply_markup = create_buttons(technology_buttons, "tech_")  # технологии
+            await query.edit_message_text(text=f"Вы выбрали: {query_data}. Теперь выберите технологию:", reply_markup=reply_markup)
         else:
-            await query.edit_message_text(text=f"Специальность: {query.data} пока в разработке")
+            await query.edit_message_text(text=f"Специальность: {query_data} пока в разработке")
 
-    # технологии
-    elif query.data in technology_buttons:
-        context.user_data['technology'] = query.data  # Сохраняем технологию
-        reply_markup = create_buttons(level_buttons)  # уровни
-        await query.edit_message_text(text=f"Вы выбрали технологию: {query.data}. Теперь выберите уровень:", reply_markup=reply_markup)
+    elif query.data.startswith("tech_"):
+        query_data = query.data[5:]
+        context.user_data['technology'] = query_data  # Сохраняем технологию
+        reply_markup = create_buttons(level_buttons, "level_")  # уровни
+        await query.edit_message_text(text=f"Вы выбрали технологию: {query_data}. Теперь выберите уровень:", reply_markup=reply_markup)
 
-    # уровни
-    elif query.data in level_buttons:
-        context.user_data['level'] = query.data  # Сохраняем уровень
+    elif query.data.startswith("level_"):
+        query_data = query.data[6:]
+        context.user_data['level'] = query_data  # Сохраняем уровень
         await query.edit_message_text(text=f"Ваш выбор: {context.user_data}. Генерирую вопросы...")
 
         # Вызов функции для генерации и отправки вопросов
@@ -92,8 +94,8 @@ def main() -> None:
 
     # Регистрируем обработчики команд и кнопок
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button))  # Обрабатывает выборы кнопок
-    application.add_handler(CallbackQueryHandler(handle_evaluation))  # Обрабатывает оценку вопросов
+    application.add_handler(CallbackQueryHandler(button, pattern='^(open_|prof_|tech_|level_)'))  # Обрабатывает выборы кнопок
+    application.add_handler(CallbackQueryHandler(handle_evaluation, pattern='^([1-5])$'))  # Обрабатывает оценку вопросов
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_comment))  # Обрабатывает комментарии
 
     application.run_polling()

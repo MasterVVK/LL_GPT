@@ -1,6 +1,6 @@
 import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from database import add_question, add_assessment
+from database import create_connection, add_question, add_assessment
 from openai_api import get_questions_from_openai
 
 # Устанавливаем уровень логирования для вывода в консоль
@@ -138,24 +138,31 @@ async def handle_comment(update, context):
 async def save_evaluation_to_db(update, context):
     """Сохраняем текущий вопрос, оценку и комментарий в базу данных"""
     try:
+        # Получаем данные из контекста
         evaluation = context.user_data['evaluations'][-1]
         question_text = evaluation['question']
         rating = evaluation['rating']
         comment = evaluation.get('comment', "")
 
+        # Получаем параметры для записи
         question_type_id = 1 if context.user_data['is_open'] == 'Открытые вопросы' else 2
         technology_id = context.user_data['technology']
         difficulty_id = context.user_data['level']
 
-        # Сохраняем вопрос и его оценку в базу данных
-        question_id = add_question(update.effective_user.id, question_text, question_type_id, technology_id,
-                                   difficulty_id)
-        add_assessment(update.effective_user.id, question_id, rating, comment)
+        # Создаем подключение к базе данных
+        conn = create_connection("project_database.db")
+        if conn is not None:
+            # Добавляем вопрос и сохраняем его идентификатор
+            question_id = add_question(conn, question_text, question_type_id, technology_id, difficulty_id)
 
-        # Логируем успешное сохранение данных
-        logging.info(f"Данные для вопроса {current_question_index} успешно сохранены.")
+            # Добавляем оценку
+            add_assessment(conn, update.effective_user.id, question_id, rating, comment)
+
+            # Закрываем соединение с базой данных
+            conn.close()
+        else:
+            raise Exception("Не удалось подключиться к базе данных")
 
     except Exception as e:
-        # Логируем ошибку и передаем ее в интерфейс
         logging.error(f"Не удалось сохранить оценку и комментарий: {str(e)}")
         raise Exception(f"Не удалось сохранить оценку и комментарий: {str(e)}")

@@ -111,6 +111,33 @@ def create_tables(conn):
     except Error as e:
         print(f"Ошибка при создании таблиц: {e}")
 
+# Функция для заполнения таблиц technologies, difficulty и question_types
+def fill_base_tables(conn):
+    """Заполняем таблицы базовыми данными из promts.py"""
+
+    try:
+        cursor = conn.cursor()
+
+        # Заполнение таблицы technologies
+        technologies = ["Python", "C++", "C#", "Java", "Java Script", "1C", "Goland"]  # данные из promts.py
+        for tech in technologies:
+            cursor.execute('''INSERT OR IGNORE INTO technologies (tech_name) VALUES (?)''', (tech,))
+
+        # Заполнение таблицы difficulty
+        difficulty_levels = ["junior", "junior+", "middle", "middle+", "senior"]  # данные из promts.py
+        for level in difficulty_levels:
+            cursor.execute('''INSERT OR IGNORE INTO difficulty (level_name) VALUES (?)''', (level,))
+
+        # Заполнение таблицы question_types
+        question_types = ["open", "close"]  # данные из promts.py
+        for q_type in question_types:
+            cursor.execute('''INSERT OR IGNORE INTO question_types (type_name) VALUES (?)''', (q_type,))
+
+        conn.commit()
+
+    except Error as e:
+        print(f"Ошибка при заполнении таблиц: {e}")
+
 # Функция для добавления нового пользователя
 def add_user(conn, telegram_id, name, email):
     """Добавление нового пользователя в базу данных"""

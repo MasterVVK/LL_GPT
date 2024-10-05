@@ -1,10 +1,10 @@
 import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, CallbackContext
 from dotenv import load_dotenv
 from promts import Promt
 from database import create_connection, add_user, create_tables, fill_base_tables
-from question_handler import generate_and_send_questions, handle_evaluation  # Импорт функций из question_handler.py
+from question_handler import generate_and_send_questions, handle_evaluation, handle_comment  # Импорт функций из question_handler.py
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -94,6 +94,7 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button))  # Обрабатывает выборы кнопок
     application.add_handler(CallbackQueryHandler(handle_evaluation))  # Обрабатывает оценку вопросов
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_comment))  # Обрабатывает комментарии
 
     application.run_polling()
 

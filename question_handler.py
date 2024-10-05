@@ -10,7 +10,6 @@ async def send_next_question(update, context):
 
     if current_question_index >= len(questions):
         await update.callback_query.message.reply_text("Все вопросы были заданы!")
-        await save_questions_to_database(update, context)
         return
 
     question = questions[current_question_index].strip()
@@ -44,9 +43,9 @@ async def generate_and_send_questions(update, context):
     context.user_data['evaluations'] = []  # Список для хранения оценок
     await send_next_question(update, context)
 
-# Функция для обработки оценки и перехода к следующему вопросу
+# Функция для обработки оценки
 async def handle_evaluation(update, context):
-    """Обрабатываем оценку и переходим к следующему вопросу"""
+    """Обрабатываем оценку и запрашиваем комментарий"""
     query = update.callback_query
     await query.answer()
 
@@ -60,22 +59,40 @@ async def handle_evaluation(update, context):
         'rating': rating
     })
 
+    # Запрашиваем комментарий к вопросу
+    await query.message.reply_text("Пожалуйста, введите комментарий к этому вопросу:")
+
+    # Переход к состоянию ожидания комментария
+    return "WAITING_FOR_COMMENT"
+
+# Функция для обработки комментария
+async def handle_comment(update, context):
+    """Обрабатываем комментарий и переходим к следующему вопросу"""
+    comment = update.message.text
+
+    # Сохраняем комментарий для текущего вопроса
+    current_question_index = context.user_data.get('current_question', 0)
+    context.user_data['evaluations'][-1]['comment'] = comment
+
+    # Сохраняем оценку и комментарий в базу данных
+    await save_evaluation_to_db(update, context)
+
     # Переходим к следующему вопросу
     context.user_data['current_question'] += 1
     await send_next_question(update, context)
 
-# Функция для сохранения всех вопросов и оценок в базу данных
-async def save_questions_to_database(update, context):
-    """Сохраняем все вопросы и оценки в базу данных после завершения"""
-    for evaluation in context.user_data['evaluations']:
-        question_text = evaluation['question']
-        rating = evaluation['rating']
+# Функция для сохранения данных в базу
+async def save_evaluation_to_db(update, context):
+    """Сохраняем текущий вопрос, оценку и комментарий в базу данных"""
+    evaluation = context.user_data['evaluations'][-1]
+    question_text = evaluation['question']
+    rating = evaluation['rating']
+    comment = evaluation.get('comment', "")
 
-        question_type_id = 1 if context.user_data['is_open'] == 'Открытые вопросы' else 2
-        technology_id = context.user_data['technology']
-        difficulty_id = context.user_data['level']
+    question_type_id = 1 if context.user_data['is_open'] == 'Открытые вопросы' else 2
+    technology_id = context.user_data['technology']
+    difficulty_id = context.user_data['level']
 
-        question_id = add_question(update.effective_user.id, question_text, question_type_id, technology_id, difficulty_id)
-        add_assessment(update.effective_user.id, question_id, rating, "")
-
-    await update.callback_query.message.reply_text("Все вопросы и оценки сохранены.")
+    # Сохраняем вопрос и его оценку в базу данных
+    question_id = add_question(update.effective_user.id, question_text, question_type_id, technology_id, difficulty_id)
+    add_assessment(update.effective_user.id, question_id, rating, comment)

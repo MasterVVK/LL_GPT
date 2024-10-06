@@ -39,7 +39,7 @@ async def start(update: Update, context: CallbackContext):
         # Получаем информацию о пользователе
         user_id = update.effective_user.id
         username = update.effective_user.full_name
-        email = ""  # Email может быть добавлен, если он доступен
+        email = update.effective_user.id  # Email может быть добавлен, если он доступен
 
         # Добавляем пользователя в базу данных
         add_user(conn, telegram_id=str(user_id), name=username, email=email)

@@ -1,6 +1,18 @@
+import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from database import create_connection, add_question, add_assessment
 from openai_api import get_questions_from_openai
+
+
+# Функция для чтения содержимого файла
+def read_file_content(file_path):
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            return file.read()
+    except FileNotFoundError:
+        print(f"Файл {file_path} не найден.")
+        return ""
+
 
 # Функция для отправки следующего вопроса
 async def send_next_question(update, context):
@@ -35,13 +47,40 @@ async def send_next_question(update, context):
 # Функция для генерации вопросов и отправки их пользователю
 async def generate_and_send_questions(update, context):
     """Генерация вопросов через OpenAI и отправка их пользователю"""
-    system_prompt = f"Ты экзаменатор на собеседовании. Твоя задача — подготовить вопросы для собеседования на позицию {context.user_data['prof']} с уровнем {context.user_data['level']} по технологии {context.user_data['technology']}."
 
-    assistant_prompt = "Генерируй список вопросов."
-    user_prompt = f"Пользователь выбрал {context.user_data['is_open']} вопросы."
+    # Путь к папке с файлами промптов
+    prompts_dir = "fastapi/Promts/"
+
+    # Чтение содержимого файлов
+    system_prompt_template = read_file_content(os.path.join(prompts_dir, "promt_system.txt"))
+    assistant_prompt_template = read_file_content(os.path.join(prompts_dir, "promt_assistant.txt"))
+    user_prompt_template = read_file_content(os.path.join(prompts_dir, "promt_user.txt"))
+
+    # Подстановка данных пользователя в шаблоны
+    system_prompt = system_prompt_template.format(
+        question_type=context.user_data['is_open'],
+        prof=context.user_data['prof'],
+        level=context.user_data['level'],
+        technology=context.user_data['technology']
+    )
+
+    assistant_prompt = assistant_prompt_template.format(
+        question_type=context.user_data['is_open'],
+        prof=context.user_data['prof'],
+        level=context.user_data['level'],
+        technology=context.user_data['technology']
+    )
+
+    user_prompt = user_prompt_template.format(
+        question_type=context.user_data['is_open'],
+        prof=context.user_data['prof'],
+        level=context.user_data['level'],
+        technology=context.user_data['technology']
+    )
 
     # Вызов функции для генерации вопросов через OpenAI
     questions = await get_questions_from_openai(system_prompt, assistant_prompt, user_prompt)
+    print(questions)
 
     # Разбиваем полученный текст на строки, считая каждую строку отдельным вопросом
     context.user_data['questions'] = [q.strip() for q in questions.split("\n") if q.strip()]

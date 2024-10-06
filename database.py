@@ -24,7 +24,7 @@ def create_tables(conn):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 telegram_id TEXT UNIQUE NOT NULL,
                 name TEXT NOT NULL,
-                email TEXT NOT NULL UNIQUE
+                email TEXT NOT NULL
             );
         ''')
 

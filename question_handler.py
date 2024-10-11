@@ -3,7 +3,6 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from database import create_connection, add_question, add_assessment
 from openai_api import get_questions_from_openai
 
-
 # Функция для чтения содержимого файла
 def read_file_content(file_path):
     try:
@@ -12,7 +11,6 @@ def read_file_content(file_path):
     except FileNotFoundError:
         print(f"Файл {file_path} не найден.")
         return ""
-
 
 # Функция для отправки следующего вопроса
 async def send_next_question(update, context):
@@ -43,18 +41,18 @@ async def send_next_question(update, context):
 
         await message.reply_text("Оцените этот вопрос:", reply_markup=reply_markup)
 
-
 # Функция для генерации вопросов и отправки их пользователю
 async def generate_and_send_questions(update, context):
     """Генерация вопросов через OpenAI и отправка их пользователю"""
 
     # Путь к папке с файлами промптов
     prompts_dir = "fastapi/Promts/"
+    question_type = context.user_data['is_open']  # open или close
 
-    # Чтение содержимого файлов
-    system_prompt_template = read_file_content(os.path.join(prompts_dir, "promt_system.txt"))
-    assistant_prompt_template = read_file_content(os.path.join(prompts_dir, "promt_assistant.txt"))
-    user_prompt_template = read_file_content(os.path.join(prompts_dir, "promt_user.txt"))
+    # Чтение содержимого файлов с промптами
+    system_prompt_template = read_file_content(os.path.join(prompts_dir, f"promt_system_{question_type}.txt"))
+    assistant_prompt_template = read_file_content(os.path.join(prompts_dir, f"promt_assistant_{question_type}.txt"))
+    user_prompt_template = read_file_content(os.path.join(prompts_dir, f"promt_user_{question_type}.txt"))
 
     # Подстановка данных пользователя в шаблоны
     system_prompt = system_prompt_template.format(
@@ -63,7 +61,6 @@ async def generate_and_send_questions(update, context):
         level=context.user_data['level'],
         technology=context.user_data['technology']
     )
-    print(system_prompt)
 
     assistant_prompt = assistant_prompt_template.format(
         question_type=context.user_data['is_open'],
@@ -71,7 +68,6 @@ async def generate_and_send_questions(update, context):
         level=context.user_data['level'],
         technology=context.user_data['technology']
     )
-    print(assistant_prompt)
 
     user_prompt = user_prompt_template.format(
         question_type=context.user_data['is_open'],
@@ -79,8 +75,8 @@ async def generate_and_send_questions(update, context):
         level=context.user_data['level'],
         technology=context.user_data['technology']
     )
-    print(user_prompt)
-    # Вызов функции для генерации вопросов через OpenAI
+
+    # Вызов функции для генерации вопросов через OpenAI API
     questions = await get_questions_from_openai(system_prompt, assistant_prompt, user_prompt)
     print(questions)
 
@@ -95,7 +91,6 @@ async def generate_and_send_questions(update, context):
     context.user_data['current_question'] = 0  # Индекс текущего вопроса
     context.user_data['evaluations'] = []  # Список для хранения оценок
     await send_next_question(update, context)
-
 
 # Функция для обработки оценки
 async def handle_evaluation(update, context):
@@ -120,7 +115,6 @@ async def handle_evaluation(update, context):
     # Устанавливаем состояние ожидания комментария
     context.user_data['awaiting_comment'] = True
 
-
 # Функция для обработки комментария
 async def handle_comment(update, context):
     """Обрабатываем комментарий и переходим к следующему вопросу"""
@@ -142,7 +136,6 @@ async def handle_comment(update, context):
             await update.message.reply_text(f"Ошибка при сохранении данных: {str(e)}")
     else:
         await update.message.reply_text("Оцените вопрос перед добавлением комментария.")
-
 
 # Функция для сохранения данных в базу
 async def save_evaluation_to_db(update, context):

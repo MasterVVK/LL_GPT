@@ -63,6 +63,7 @@ async def generate_and_send_questions(update, context):
         level=context.user_data['level'],
         technology=context.user_data['technology']
     )
+    print(system_prompt)
 
     assistant_prompt = assistant_prompt_template.format(
         question_type=context.user_data['is_open'],
@@ -70,6 +71,7 @@ async def generate_and_send_questions(update, context):
         level=context.user_data['level'],
         technology=context.user_data['technology']
     )
+    print(assistant_prompt)
 
     user_prompt = user_prompt_template.format(
         question_type=context.user_data['is_open'],
@@ -77,7 +79,7 @@ async def generate_and_send_questions(update, context):
         level=context.user_data['level'],
         technology=context.user_data['technology']
     )
-
+    print(user_prompt)
     # Вызов функции для генерации вопросов через OpenAI
     questions = await get_questions_from_openai(system_prompt, assistant_prompt, user_prompt)
     print(questions)

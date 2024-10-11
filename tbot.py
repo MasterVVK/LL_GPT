@@ -53,13 +53,14 @@ async def button(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
 
-    # Определяем, какой тип данных был отправлен (префиксы)
-    if query.data.startswith("open_"):
-        query_data = query.data[5:]  # Убираем префикс "open_"
-        context.user_data['is_open'] = query_data  # Сохраняем тип вопроса
-        reply_markup = create_buttons(prof_buttons, "prof_")  # специальность
+    # Обрабатываем выбор типа вопросов (открытые или закрытые)
+    if query.data.startswith("open_") or query.data.startswith("close_"):
+        query_data = query.data.split("_")[1]
+        context.user_data['is_open'] = "open" if query.data.startswith("open_") else "close"  # Проверка типа вопросов
+        reply_markup = create_buttons(prof_buttons, "prof_")
         await query.edit_message_text(text=f"Вы выбрали: {query_data}. Теперь выберите профессию:", reply_markup=reply_markup)
 
+    # Обрабатываем выбор профессии
     elif query.data.startswith("prof_"):
         query_data = query.data[5:]
         context.user_data['prof'] = query_data  # Сохраняем профессию
@@ -69,21 +70,23 @@ async def button(update: Update, context: CallbackContext):
         else:
             await query.edit_message_text(text=f"Специальность: {query_data} пока в разработке")
 
+    # Обрабатываем выбор технологии
     elif query.data.startswith("tech_"):
         query_data = query.data[5:]
         context.user_data['technology'] = query_data  # Сохраняем технологию
         reply_markup = create_buttons(level_buttons, "level_")  # уровни
         await query.edit_message_text(text=f"Вы выбрали технологию: {query_data}. Теперь выберите уровень:", reply_markup=reply_markup)
 
+    # Обрабатываем выбор уровня
     elif query.data.startswith("level_"):
         query_data = query.data[6:]
         context.user_data['level'] = query_data  # Сохраняем уровень
         await query.edit_message_text(text=f"Ваш выбор: {context.user_data}. Генерирую вопросы...")
 
-        # Вызов функции для генерации и отправки вопросов
+        # Вызов функции для генерации и отправки вопросов из question_handler
         await generate_and_send_questions(update, context)
 
-# Основная функция
+# Основная функция запуска бота
 def main() -> None:
     # создаем приложение и передаем в него токен
     application = Application.builder().token(TOKEN).build()
@@ -97,7 +100,7 @@ def main() -> None:
 
     # Регистрируем обработчики команд и кнопок
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button, pattern='^(open_|prof_|tech_|level_)'))  # Обрабатывает выборы кнопок
+    application.add_handler(CallbackQueryHandler(button, pattern='^(open_|close_|prof_|tech_|level_)'))  # Обрабатывает выборы кнопок
     application.add_handler(CallbackQueryHandler(handle_evaluation, pattern='^([1-5])$'))  # Обрабатывает оценку вопросов
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_comment))  # Обрабатывает комментарии
 

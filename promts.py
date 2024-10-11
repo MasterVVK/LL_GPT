@@ -8,7 +8,7 @@ class Promt:
                     "technology": ["Python", "C++", "C#", "Java", "Java Script", "1C", "Goland"], #потом добавлю и подумаю над структурой
                     "level": ["junior", "junior+", "middle", "middle+", "senior"],
                     "subtech": ["framework","lib","linked_tech"],
-                    "num_questions":""           
+                    "num_questions": "5"
                     }
     
 

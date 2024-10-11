@@ -73,7 +73,8 @@ async def generate_and_send_questions(update, context):
         question_type=context.user_data['is_open'],
         prof=context.user_data['prof'],
         level=context.user_data['level'],
-        technology=context.user_data['technology']
+        technology=context.user_data['technology'],
+        num_questions=context.user_data['num_questions']
     )
 
     # Вызов функции для генерации вопросов через OpenAI API

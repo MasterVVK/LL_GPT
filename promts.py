@@ -18,7 +18,7 @@ class Promt:
                     ("user","open"): "promt_user_open.txt",
                     ("system","close"): "promt_system_close.txt",
                     ("assistant","close"): "promt_assistant_close.txt",
-                    ("user","close"): "promt_user_open.txt"                  
+                    ("user","close"): "promt_user_close.txt"
                 }
     
     replace_dict = {"Разработчик":"Программист, разработчик программного обеспечения на языке программирования",

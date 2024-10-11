@@ -63,7 +63,8 @@ async def send_next_question(update, context):
                                  f"a) {question['options'][0]}\n"
                                  f"b) {question['options'][1]}\n"
                                  f"c) {question['options'][2]}\n"
-                                 f"d) {question['options'][3]}\n")
+                                 f"d) {question['options'][3]}\n"
+                                 f"\nПравильный ответ: {question['correct']}")
     else:
         # Для открытых вопросов просто отправляем текст
         await message.reply_text(f"Вопрос {current_question_index + 1}: {question.strip()}")

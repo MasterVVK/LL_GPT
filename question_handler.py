@@ -2,6 +2,7 @@ import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from database import create_connection, add_question, add_assessment
 from openai_api import get_questions_from_openai
+from promts import Promt
 
 # Функция для чтения содержимого файла
 def read_file_content(file_path):
@@ -48,6 +49,7 @@ async def generate_and_send_questions(update, context):
     # Путь к папке с файлами промптов
     prompts_dir = "fastapi/Promts/"
     question_type = context.user_data['is_open']  # open или close
+    num_questions = Promt.params_dict["num_questions"]
 
     # Чтение содержимого файлов с промптами
     system_prompt_template = read_file_content(os.path.join(prompts_dir, f"promt_system_{question_type}.txt"))
@@ -74,7 +76,7 @@ async def generate_and_send_questions(update, context):
         prof=context.user_data['prof'],
         level=context.user_data['level'],
         technology=context.user_data['technology'],
-        num_questions=context.user_data['num_questions']
+        num_questions=num_questions
     )
 
     # Вызов функции для генерации вопросов через OpenAI API

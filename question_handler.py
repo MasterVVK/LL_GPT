@@ -1,8 +1,10 @@
 import os
+import re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from database import create_connection, add_question, add_assessment
 from openai_api import get_questions_from_openai
 from promts import Promt
+
 
 # Функция для чтения содержимого файла
 def read_file_content(file_path):
@@ -12,6 +14,29 @@ def read_file_content(file_path):
     except FileNotFoundError:
         print(f"Файл {file_path} не найден.")
         return ""
+
+
+# Функция для парсинга закрытых вопросов с вариантами ответов
+def parse_generated_questions(generated_text):
+    """
+    Парсинг сгенерированных вопросов, вариантов ответов и правильного ответа.
+    Возвращает список вопросов с вариантами ответов.
+    """
+    questions = []
+    pattern = r"Вопрос: (.*?)\nВарианты ответов:\n(?:a\) (.*?)\n)?(?:b\) (.*?)\n)?(?:c\) (.*?)\n)?(?:d\) (.*?)\n)?Правильный ответ: (\w)"
+
+    matches = re.findall(pattern, generated_text)
+
+    for match in matches:
+        question = {
+            'text': match[0],
+            'options': [match[1], match[2], match[3], match[4]],
+            'correct': match[5]  # Например, "a", "b", "c" или "d"
+        }
+        questions.append(question)
+
+    return questions
+
 
 # Функция для отправки следующего вопроса
 async def send_next_question(update, context):
@@ -25,22 +50,35 @@ async def send_next_question(update, context):
         await message.reply_text("Все вопросы были заданы!")
         return
 
-    # Отправляем следующий вопрос
-    question = questions[current_question_index].strip()
-    if question:
-        message = update.callback_query.message if update.callback_query else update.message
-        await message.reply_text(f"Вопрос {current_question_index + 1}: {question}\nОцените этот вопрос от 1 до 5:")
+    # Определяем переменную message
+    message = update.message if update.message else update.callback_query.message
 
-        # Кнопки для оценки
-        reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("1", callback_data='1')],
-            [InlineKeyboardButton("2", callback_data='2')],
-            [InlineKeyboardButton("3", callback_data='3')],
-            [InlineKeyboardButton("4", callback_data='4')],
-            [InlineKeyboardButton("5", callback_data='5')]
-        ])
+    # Получаем текущий вопрос
+    question = questions[current_question_index]
 
-        await message.reply_text("Оцените этот вопрос:", reply_markup=reply_markup)
+    # Если это закрытые вопросы, отправляем варианты ответов
+    if context.user_data['is_open'] == "close":
+        await message.reply_text(f"Вопрос {current_question_index + 1}: {question['text']}\n"
+                                 f"Варианты ответов:\n"
+                                 f"a) {question['options'][0]}\n"
+                                 f"b) {question['options'][1]}\n"
+                                 f"c) {question['options'][2]}\n"
+                                 f"d) {question['options'][3]}\n")
+    else:
+        # Для открытых вопросов просто отправляем текст
+        await message.reply_text(f"Вопрос {current_question_index + 1}: {question.strip()}")
+
+    # Оценка вопроса
+    reply_markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("1", callback_data='1')],
+        [InlineKeyboardButton("2", callback_data='2')],
+        [InlineKeyboardButton("3", callback_data='3')],
+        [InlineKeyboardButton("4", callback_data='4')],
+        [InlineKeyboardButton("5", callback_data='5')]
+    ])
+
+    await message.reply_text("Оцените этот вопрос:", reply_markup=reply_markup)
+
 
 # Функция для генерации вопросов и отправки их пользователю
 async def generate_and_send_questions(update, context):
@@ -83,17 +121,23 @@ async def generate_and_send_questions(update, context):
     questions = await get_questions_from_openai(system_prompt, assistant_prompt, user_prompt)
     print(questions)
 
-    # Разбиваем полученный текст на строки, считая каждую строку отдельным вопросом
-    context.user_data['questions'] = [q.strip() for q in questions.split("\n") if q.strip()]
+    # Если тип вопроса закрытый, используем парсинг для вариантов ответов
+    if context.user_data['is_open'] == "close":
+        context.user_data['questions'] = parse_generated_questions(questions)
+    else:
+        # Для открытых вопросов просто сохраняем текст
+        context.user_data['questions'] = [q.strip() for q in questions.split("\n") if q.strip()]
 
     # Проверяем, были ли сгенерированы вопросы
     if not context.user_data['questions']:
-        await update.message.reply_text("Не удалось сгенерировать вопросы. Попробуйте снова.")
+        message = update.message if update.message else update.callback_query.message
+        await message.reply_text("Не удалось сгенерировать вопросы. Попробуйте снова.")
         return
 
     context.user_data['current_question'] = 0  # Индекс текущего вопроса
     context.user_data['evaluations'] = []  # Список для хранения оценок
     await send_next_question(update, context)
+
 
 # Функция для обработки оценки
 async def handle_evaluation(update, context):
@@ -118,6 +162,7 @@ async def handle_evaluation(update, context):
     # Устанавливаем состояние ожидания комментария
     context.user_data['awaiting_comment'] = True
 
+
 # Функция для обработки комментария
 async def handle_comment(update, context):
     """Обрабатываем комментарий и переходим к следующему вопросу"""
@@ -139,6 +184,7 @@ async def handle_comment(update, context):
             await update.message.reply_text(f"Ошибка при сохранении данных: {str(e)}")
     else:
         await update.message.reply_text("Оцените вопрос перед добавлением комментария.")
+
 
 # Функция для сохранения данных в базу
 async def save_evaluation_to_db(update, context):

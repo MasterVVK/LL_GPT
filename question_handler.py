@@ -261,18 +261,21 @@ async def handle_answer_block_comment(update, context):
         comment = update.message.text
 
         # Сохраняем комментарий для блока ответов
+        current_question_index = context.user_data.get('current_question', 0)
         context.user_data['evaluations'][-1]['answer_block_comment'] = comment
 
         # Попробуем сохранить оценку и комментарий в базу данных
         try:
             await save_evaluation_to_db(update, context)
-            context.user_data['current_question'] += 1  # Переходим к следующему вопросу
+
+            # Переходим к следующему вопросу
+            context.user_data['current_question'] += 1
 
             # Сбрасываем флаги
             context.user_data['awaiting_answer_block'] = False
             context.user_data['awaiting_answer_block_comment'] = False
 
-            # Переход к следующему вопросу
+            # Проверяем, остались ли еще вопросы, если да, отправляем следующий
             await send_next_question(update, context)  # Отправляем следующий вопрос
         except Exception as e:
             await update.message.reply_text(f"Ошибка при сохранении данных: {str(e)}")

@@ -175,6 +175,9 @@ async def handle_comment(update, context):
         current_question_index = context.user_data.get('current_question', 0)
         context.user_data['evaluations'][-1]['comment'] = comment
 
+        # Сбрасываем флаг ожидания комментария
+        context.user_data['awaiting_comment'] = False
+
         # Проверяем, закрытый это вопрос или открытый
         if context.user_data['is_open'] == "close":
             # Для закрытых вопросов переходим к оценке блока ответов
@@ -192,11 +195,9 @@ async def handle_comment(update, context):
             try:
                 await save_evaluation_to_db(update, context)
                 context.user_data['current_question'] += 1  # Переходим к следующему вопросу
-                context.user_data['awaiting_comment'] = False  # Сбрасываем флаг комментария
                 await send_next_question(update, context)  # Отправляем следующий вопрос
             except Exception as e:
                 await update.message.reply_text(f"Ошибка при сохранении данных: {str(e)}")
-
 
 # Функция для обработки оценки блока ответов
 async def handle_answer_block_evaluation(update, context):
@@ -227,9 +228,12 @@ async def handle_answer_block_comment(update, context):
         try:
             await save_evaluation_to_db(update, context)
             context.user_data['current_question'] += 1  # Переходим к следующему вопросу
-            context.user_data['awaiting_comment'] = False  # Сбрасываем флаги
+
+            # Сбрасываем флаги
             context.user_data['awaiting_answer_block'] = False
             context.user_data['awaiting_answer_block_comment'] = False
+
+            # Переход к следующему вопросу
             await send_next_question(update, context)  # Отправляем следующий вопрос
         except Exception as e:
             await update.message.reply_text(f"Ошибка при сохранении данных: {str(e)}")

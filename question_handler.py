@@ -56,6 +56,15 @@ async def send_next_question(update, context):
     # Получаем текущий вопрос
     question = questions[current_question_index]
 
+    # Добавляем запись в evaluations для текущего вопроса
+    context.user_data['evaluations'].append({
+        'question': question['text'] if context.user_data['is_open'] == "close" else question,
+        'rating': None,
+        'comment': None,
+        'answer_block_rating': None,
+        'answer_block_comment': None
+    })
+
     # Если это закрытые вопросы, отправляем варианты ответов
     if context.user_data['is_open'] == "close":
         await message.reply_text(f"Вопрос {current_question_index + 1}: {question['text']}\n"
@@ -161,10 +170,7 @@ async def handle_evaluation(update, context):
 
         # Сохраняем оценку для текущего открытого вопроса
         current_question_index = context.user_data.get('current_question', 0)
-        context.user_data['evaluations'].append({
-            'question': context.user_data['questions'][current_question_index],
-            'rating': rating
-        })
+        context.user_data['evaluations'][current_question_index]['rating'] = rating
 
         # Переходим к запросу комментария для открытого вопроса
         await query.message.reply_text("Пожалуйста, введите комментарий к этому вопросу:")
@@ -176,12 +182,11 @@ async def handle_evaluation(update, context):
 
         # Сохраняем оценку блока ответов
         current_question_index = context.user_data.get('current_question', 0)
-        context.user_data['evaluations'][-1]['answer_block_rating'] = rating
+        context.user_data['evaluations'][current_question_index]['answer_block_rating'] = rating
 
         # Переходим к запросу комментария к блоку ответов
         await query.message.reply_text("Пожалуйста, введите комментарий к блоку ответов:")
         context.user_data['awaiting_answer_block_comment'] = True
-
 
 # Функция для обработки комментария к вопросу и перехода к оценке блока ответов или следующему вопросу
 async def handle_comment(update, context):

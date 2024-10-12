@@ -65,21 +65,29 @@ async def send_next_question(update, context):
                                  f"c) {question['options'][2]}\n"
                                  f"d) {question['options'][3]}\n"
                                  f"\nПравильный ответ: {question['correct']}")
+
+        # Оценка блока ответов для закрытых вопросов
+        reply_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("1", callback_data='close_1')],
+            [InlineKeyboardButton("2", callback_data='close_2')],
+            [InlineKeyboardButton("3", callback_data='close_3')],
+            [InlineKeyboardButton("4", callback_data='close_4')],
+            [InlineKeyboardButton("5", callback_data='close_5')]
+        ])
+        await message.reply_text("Оцените блок ответов:", reply_markup=reply_markup)
     else:
-        # Для открытых вопросов просто отправляем текст
+        # Для открытых вопросов просто отправляем текст и просим оценку
         await message.reply_text(f"Вопрос {current_question_index + 1}: {question.strip()}")
 
-    # Оценка вопроса
-    reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("1", callback_data='1')],
-        [InlineKeyboardButton("2", callback_data='2')],
-        [InlineKeyboardButton("3", callback_data='3')],
-        [InlineKeyboardButton("4", callback_data='4')],
-        [InlineKeyboardButton("5", callback_data='5')]
-    ])
-
-    await message.reply_text("Оцените этот вопрос:", reply_markup=reply_markup)
-
+        # Оценка для открытых вопросов
+        reply_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("1", callback_data='open_1')],
+            [InlineKeyboardButton("2", callback_data='open_2')],
+            [InlineKeyboardButton("3", callback_data='open_3')],
+            [InlineKeyboardButton("4", callback_data='open_4')],
+            [InlineKeyboardButton("5", callback_data='open_5')]
+        ])
+        await message.reply_text("Оцените этот вопрос:", reply_markup=reply_markup)
 
 # Функция для генерации вопросов и отправки их пользователю
 async def generate_and_send_questions(update, context):
@@ -146,22 +154,33 @@ async def handle_evaluation(update, context):
     query = update.callback_query
     await query.answer()
 
-    # Получаем оценку пользователя
-    rating = int(query.data)
+    # Определяем, это оценка открытого вопроса или блока ответов закрытого вопроса
+    if query.data.startswith("open_"):
+        # Это оценка открытого вопроса
+        rating = int(query.data.split("_")[1])
 
-    # Сохраняем оценку для текущего вопроса
-    current_question_index = context.user_data.get('current_question', 0)
+        # Сохраняем оценку для текущего открытого вопроса
+        current_question_index = context.user_data.get('current_question', 0)
+        context.user_data['evaluations'].append({
+            'question': context.user_data['questions'][current_question_index],
+            'rating': rating
+        })
 
-    context.user_data['evaluations'].append({
-        'question': context.user_data['questions'][current_question_index],
-        'rating': rating
-    })
+        # Переходим к запросу комментария для открытого вопроса
+        await query.message.reply_text("Пожалуйста, введите комментарий к этому вопросу:")
+        context.user_data['awaiting_comment'] = True
 
-    # Переходим к запросу комментария
-    await query.message.reply_text("Пожалуйста, введите комментарий к этому вопросу:")
+    elif query.data.startswith("close_"):
+        # Это оценка блока ответов закрытого вопроса
+        rating = int(query.data.split("_")[1])
 
-    # Устанавливаем состояние ожидания комментария
-    context.user_data['awaiting_comment'] = True
+        # Сохраняем оценку блока ответов
+        current_question_index = context.user_data.get('current_question', 0)
+        context.user_data['evaluations'][-1]['answer_block_rating'] = rating
+
+        # Переходим к запросу комментария к блоку ответов
+        await query.message.reply_text("Пожалуйста, введите комментарий к блоку ответов:")
+        context.user_data['awaiting_answer_block_comment'] = True
 
 
 # Функция для обработки комментария к вопросу и перехода к оценке блока ответов или следующему вопросу

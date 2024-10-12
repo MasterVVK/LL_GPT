@@ -1,7 +1,7 @@
 import os
 import re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from database import create_connection, add_question, add_assessment
+from database import create_connection, add_question, add_assessment, add_answer, add_answer_assessment
 from openai_api import get_questions_from_openai
 from promts import Promt
 
@@ -253,9 +253,9 @@ async def handle_answer_block_evaluation(update, context):
         await update.callback_query.message.reply_text("Пожалуйста, введите комментарий к блоку ответов:")
         context.user_data['awaiting_answer_block_comment'] = True
 
-# Функция для обработки комментария к блоку ответов и перехода к следующему вопросу
+# Функция для обработки комментария к блоку ответов
 async def handle_answer_block_comment(update, context):
-    """Обрабатываем комментарий к блоку ответов и переходим к следующему вопросу"""
+    """Обрабатываем комментарий к блоку ответов и сохраняем все данные по закрытому вопросу"""
     if context.user_data.get('awaiting_answer_block_comment', False):
         # Получаем комментарий от пользователя
         comment = update.message.text
@@ -266,6 +266,7 @@ async def handle_answer_block_comment(update, context):
 
         # Попробуем сохранить оценку и комментарий в базу данных
         try:
+            # Сохраняем данные в базу
             await save_evaluation_to_db(update, context)
 
             # Переходим к следующему вопросу
@@ -280,38 +281,73 @@ async def handle_answer_block_comment(update, context):
         except Exception as e:
             await update.message.reply_text(f"Ошибка при сохранении данных: {str(e)}")
 
-# Обновляем функцию для сохранения данных в базе данных
 async def save_evaluation_to_db(update, context):
     """Сохраняем текущий вопрос, оценки и комментарии в базу данных"""
     try:
         evaluation = context.user_data['evaluations'][-1]
-        question_text = evaluation['question']
-        question_rating = evaluation['rating']
-        question_comment = evaluation.get('comment', "")
-        answer_block_rating = evaluation.get('answer_block_rating', None)
-        answer_block_comment = evaluation.get('answer_block_comment', "")
+        question_data = context.user_data['questions'][context.user_data['current_question']]
 
-        question_type_id = 1 if context.user_data['is_open'] == 'Открытые вопросы' else 2
-        technology_id = context.user_data['technology']
-        difficulty_id = context.user_data['level']
+        # Проверка типа вопроса: открытый или закрытый
+        if context.user_data['is_open'] == "close":
+            # Обработка закрытого вопроса (с вариантами ответов)
+            question_text = question_data['text']
+            options = question_data['options']
+            correct_answer = question_data['correct']
+            question_rating = evaluation['rating']
+            question_comment = evaluation.get('comment', "")
+            answer_block_rating = evaluation.get('answer_block_rating', None)
+            answer_block_comment = evaluation.get('answer_block_comment', "")
 
-        # Создаем подключение к базе данных
-        conn = create_connection("project_database.db")
-        if conn is not None:
-            # Добавляем вопрос и сохраняем его идентификатор
-            question_id = add_question(conn, question_text, question_type_id, technology_id, difficulty_id)
+            question_type_id = 2  # Закрытые вопросы
+            technology_id = context.user_data['technology']
+            difficulty_id = context.user_data['level']
 
-            # Добавляем оценку вопроса
-            add_assessment(conn, update.effective_user.id, question_id, question_rating, question_comment)
+            # Создаем подключение к базе данных
+            conn = create_connection("project_database.db")
+            if conn is not None:
+                # Сохраняем закрытый вопрос
+                question_id = add_question(conn, question_text, question_type_id, technology_id, difficulty_id)
 
-            # Если есть оценка блока ответов, сохраняем её
-            if answer_block_rating:
-                add_assessment(conn, update.effective_user.id, question_id, answer_block_rating, answer_block_comment, is_answer_block=True)
+                # Сохраняем варианты ответов
+                for i, option in enumerate(options):
+                    is_correct = (chr(97 + i) == correct_answer)  # 'a' -> 97 в ASCII
+                    add_answer(conn, question_id, option, is_correct)
 
-            # Закрываем соединение с базой данных
-            conn.close()
+                # Сохраняем оценку и комментарий к вопросу
+                add_assessment(conn, update.effective_user.id, question_id, question_rating, question_comment)
+
+                # Сохраняем оценку и комментарий к блоку ответов
+                if answer_block_rating:
+                    add_answer_assessment(conn, update.effective_user.id, question_id, answer_block_rating, answer_block_comment)
+
+                # Закрываем соединение с базой данных
+                conn.close()
+            else:
+                raise Exception("Не удалось подключиться к базе данных")
+
         else:
-            raise Exception("Не удалось подключиться к базе данных")
+            # Обработка открытого вопроса (без вариантов ответов)
+            question_text = question_data  # В открытых вопросах `question_data` — это строка с текстом вопроса
+            question_rating = evaluation['rating']
+            question_comment = evaluation.get('comment', "")
+
+            question_type_id = 1  # Открытые вопросы
+            technology_id = context.user_data['technology']
+            difficulty_id = context.user_data['level']
+
+            # Создаем подключение к базе данных
+            conn = create_connection("project_database.db")
+            if conn is not None:
+                # Сохраняем открытый вопрос
+                question_id = add_question(conn, question_text, question_type_id, technology_id, difficulty_id)
+
+                # Сохраняем оценку и комментарий к вопросу
+                add_assessment(conn, update.effective_user.id, question_id, question_rating, question_comment)
+
+                # Закрываем соединение с базой данных
+                conn.close()
+            else:
+                raise Exception("Не удалось подключиться к базе данных")
 
     except Exception as e:
-        raise Exception(f"Не удалось сохранить оценку и комментарий: {str(e)}")
+        raise Exception(f"Не удалось сохранить данные: {str(e)}")

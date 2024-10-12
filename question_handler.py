@@ -56,15 +56,6 @@ async def send_next_question(update, context):
     # Получаем текущий вопрос
     question = questions[current_question_index]
 
-    # Добавляем запись в evaluations для текущего вопроса
-    context.user_data['evaluations'].append({
-        'question': question['text'] if context.user_data['is_open'] == "close" else question,
-        'rating': None,
-        'comment': None,
-        'answer_block_rating': None,
-        'answer_block_comment': None
-    })
-
     # Если это закрытые вопросы, отправляем варианты ответов
     if context.user_data['is_open'] == "close":
         await message.reply_text(f"Вопрос {current_question_index + 1}: {question['text']}\n"
@@ -75,15 +66,15 @@ async def send_next_question(update, context):
                                  f"d) {question['options'][3]}\n"
                                  f"\nПравильный ответ: {question['correct']}")
 
-        # Оценка блока ответов для закрытых вопросов
+        # Оценка закрытого вопроса
         reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("1", callback_data='close_1')],
-            [InlineKeyboardButton("2", callback_data='close_2')],
-            [InlineKeyboardButton("3", callback_data='close_3')],
-            [InlineKeyboardButton("4", callback_data='close_4')],
-            [InlineKeyboardButton("5", callback_data='close_5')]
+            [InlineKeyboardButton("1", callback_data='close_question_1')],
+            [InlineKeyboardButton("2", callback_data='close_question_2')],
+            [InlineKeyboardButton("3", callback_data='close_question_3')],
+            [InlineKeyboardButton("4", callback_data='close_question_4')],
+            [InlineKeyboardButton("5", callback_data='close_question_5')]
         ])
-        await message.reply_text("Оцените блок ответов:", reply_markup=reply_markup)
+        await message.reply_text("Оцените закрытый вопрос:", reply_markup=reply_markup)
     else:
         # Для открытых вопросов просто отправляем текст и просим оценку
         await message.reply_text(f"Вопрос {current_question_index + 1}: {question.strip()}")
@@ -97,6 +88,7 @@ async def send_next_question(update, context):
             [InlineKeyboardButton("5", callback_data='open_5')]
         ])
         await message.reply_text("Оцените этот вопрос:", reply_markup=reply_markup)
+
 
 # Функция для генерации вопросов и отправки их пользователю
 async def generate_and_send_questions(update, context):
@@ -163,30 +155,49 @@ async def handle_evaluation(update, context):
     query = update.callback_query
     await query.answer()
 
-    # Определяем, это оценка открытого вопроса или блока ответов закрытого вопроса
+    # Определяем, это оценка открытого вопроса, закрытого вопроса или блока ответов закрытого вопроса
     if query.data.startswith("open_"):
         # Это оценка открытого вопроса
         rating = int(query.data.split("_")[1])
 
         # Сохраняем оценку для текущего открытого вопроса
         current_question_index = context.user_data.get('current_question', 0)
-        context.user_data['evaluations'][current_question_index]['rating'] = rating
+        context.user_data['evaluations'].append({
+            'question': context.user_data['questions'][current_question_index],
+            'rating': rating
+        })
 
         # Переходим к запросу комментария для открытого вопроса
         await query.message.reply_text("Пожалуйста, введите комментарий к этому вопросу:")
         context.user_data['awaiting_comment'] = True
 
-    elif query.data.startswith("close_"):
+    elif query.data.startswith("close_question_"):
+        # Это оценка закрытого вопроса
+        rating = int(query.data.split("_")[2])
+
+        # Сохраняем оценку закрытого вопроса
+        current_question_index = context.user_data.get('current_question', 0)
+        context.user_data['evaluations'].append({
+            'question': context.user_data['questions'][current_question_index],
+            'rating': rating
+        })
+
+        # Переходим к запросу комментария для закрытого вопроса
+        await query.message.reply_text("Пожалуйста, введите комментарий к закрытому вопросу:")
+        context.user_data['awaiting_comment'] = True
+
+    elif query.data.startswith("close_block_"):
         # Это оценка блока ответов закрытого вопроса
-        rating = int(query.data.split("_")[1])
+        rating = int(query.data.split("_")[2])
 
         # Сохраняем оценку блока ответов
         current_question_index = context.user_data.get('current_question', 0)
-        context.user_data['evaluations'][current_question_index]['answer_block_rating'] = rating
+        context.user_data['evaluations'][-1]['answer_block_rating'] = rating
 
         # Переходим к запросу комментария к блоку ответов
         await query.message.reply_text("Пожалуйста, введите комментарий к блоку ответов:")
         context.user_data['awaiting_answer_block_comment'] = True
+
 
 # Функция для обработки комментария к вопросу
 async def handle_comment(update, context):

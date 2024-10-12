@@ -103,7 +103,7 @@ def main() -> None:
     # Регистрируем обработчики команд и кнопок
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button, pattern='^(Открытые вопросы|Закрытые вопросы|prof_|tech_|level_)'))  # Обрабатывает выборы кнопок
-    application.add_handler(CallbackQueryHandler(handle_evaluation, pattern='^(open|close)_([1-5])$'))  # Обрабатывает оценку вопросов
+    application.add_handler(CallbackQueryHandler(handle_evaluation, pattern='^(open|close_question)_([1-5])$'))  # Обрабатывает оценку вопросов
     application.add_handler(CallbackQueryHandler(handle_answer_block_evaluation, pattern='^(close_block)_([1-5])$'))  # Оценка блока ответов
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_comment))  # Обрабатывает комментарии
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_answer_block_comment))  # Обрабатывает комментарии к блоку ответов

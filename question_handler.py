@@ -188,7 +188,7 @@ async def handle_evaluation(update, context):
         await query.message.reply_text("Пожалуйста, введите комментарий к блоку ответов:")
         context.user_data['awaiting_answer_block_comment'] = True
 
-# Функция для обработки комментария к вопросу и перехода к оценке блока ответов или следующему вопросу
+# Функция для обработки комментария к вопросу
 async def handle_comment(update, context):
     """Обрабатываем комментарий к вопросу и проверяем тип вопроса"""
     if context.user_data.get('awaiting_comment', False):
@@ -204,15 +204,18 @@ async def handle_comment(update, context):
 
         # Проверяем, закрытый это вопрос или открытый
         if context.user_data['is_open'] == "close":
-            # Для закрытых вопросов переходим к оценке блока ответов
+            # Переходим к оценке блока ответов для закрытых вопросов
+            await update.message.reply_text("Комментарий сохранен. Теперь оцените блок ответов.")
+
+            # Кнопки для оценки блока ответов
             reply_markup = InlineKeyboardMarkup([
-                [InlineKeyboardButton("1", callback_data='1')],
-                [InlineKeyboardButton("2", callback_data='2')],
-                [InlineKeyboardButton("3", callback_data='3')],
-                [InlineKeyboardButton("4", callback_data='4')],
-                [InlineKeyboardButton("5", callback_data='5')]
+                [InlineKeyboardButton("1", callback_data='close_block_1')],
+                [InlineKeyboardButton("2", callback_data='close_block_2')],
+                [InlineKeyboardButton("3", callback_data='close_block_3')],
+                [InlineKeyboardButton("4", callback_data='close_block_4')],
+                [InlineKeyboardButton("5", callback_data='close_block_5')]
             ])
-            await update.message.reply_text("Пожалуйста, оцените блок ответов от 1 до 5:", reply_markup=reply_markup)
+            await update.message.reply_text("Оцените блок ответов от 1 до 5:", reply_markup=reply_markup)
             context.user_data['awaiting_answer_block'] = True
         else:
             # Для открытых вопросов сразу переходим к следующему вопросу
@@ -222,6 +225,7 @@ async def handle_comment(update, context):
                 await send_next_question(update, context)  # Отправляем следующий вопрос
             except Exception as e:
                 await update.message.reply_text(f"Ошибка при сохранении данных: {str(e)}")
+
 
 # Функция для обработки оценки блока ответов
 async def handle_answer_block_evaluation(update, context):

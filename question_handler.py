@@ -252,6 +252,10 @@ async def handle_answer_block_evaluation(update, context):
         # Переходим к запросу комментария к блоку ответов
         await update.callback_query.message.reply_text("Пожалуйста, введите комментарий к блоку ответов:")
         context.user_data['awaiting_answer_block_comment'] = True
+        # Логируем установку флага
+        print("Флаг awaiting_answer_block_comment установлен в True.")
+    else:
+        print("Флаг awaiting_answer_block не установлен, функция не выполнена.")
 
 # Функция для обработки комментария к блоку ответов
 async def handle_answer_block_comment(update, context):
@@ -288,8 +292,10 @@ async def save_evaluation_to_db(update, context):
         question_data = context.user_data['questions'][context.user_data['current_question']]
 
         # Проверка типа вопроса: открытый или закрытый
+        print(context.user_data['is_open'])
         if context.user_data['is_open'] == "close":
             # Обработка закрытого вопроса (с вариантами ответов)
+            print("Обработка закрытого вопроса")
             question_text = question_data['text']
             options = question_data['options']
             correct_answer = question_data['correct']

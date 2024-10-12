@@ -88,6 +88,19 @@ async def button(update: Update, context: CallbackContext):
         # Вызов функции для генерации и отправки вопросов
         await generate_and_send_questions(update, context)
 
+async def handle_message(update, context):
+    """Обрабатываем текстовые сообщения и определяем, что именно ждет бот"""
+
+    if context.user_data.get('awaiting_comment', False):
+        # Если бот ждет комментарий к вопросу
+        await handle_comment(update, context)
+    elif context.user_data.get('awaiting_answer_block_comment', False):
+        # Если бот ждет комментарий к блоку ответов
+        await handle_answer_block_comment(update, context)
+    else:
+        await update.message.reply_text("Пожалуйста, выполните предыдущие шаги, прежде чем добавлять комментарии.")
+
+
 # Основная функция запуска бота
 def main() -> None:
     # создаем приложение и передаем в него токен
@@ -105,8 +118,7 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(button, pattern='^(Открытые вопросы|Закрытые вопросы|prof_|tech_|level_)'))  # Обрабатывает выборы кнопок
     application.add_handler(CallbackQueryHandler(handle_evaluation, pattern='^(open|close_question)_([1-5])$'))  # Обрабатывает оценку вопросов
     application.add_handler(CallbackQueryHandler(handle_answer_block_evaluation, pattern='^(close_block)_([1-5])$'))  # Оценка блока ответов
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_comment))  # Обрабатывает комментарии
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_answer_block_comment))  # Обрабатывает комментарии к блоку ответов
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))  # Универсальная обработка текстовых сообщений
 
     application.run_polling()
 

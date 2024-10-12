@@ -164,9 +164,9 @@ async def handle_evaluation(update, context):
     context.user_data['awaiting_comment'] = True
 
 
-# Функция для обработки комментария
+# Функция для обработки комментария к вопросу и перехода к оценке блока ответов или следующему вопросу
 async def handle_comment(update, context):
-    """Обрабатываем комментарий и переходим к следующему вопросу"""
+    """Обрабатываем комментарий к вопросу и проверяем тип вопроса"""
     if context.user_data.get('awaiting_comment', False):
         # Получаем комментарий от пользователя
         comment = update.message.text
@@ -175,26 +175,67 @@ async def handle_comment(update, context):
         current_question_index = context.user_data.get('current_question', 0)
         context.user_data['evaluations'][-1]['comment'] = comment
 
+        # Проверяем, закрытый это вопрос или открытый
+        if context.user_data['is_open'] == "close":
+            # Для закрытых вопросов переходим к оценке блока ответов
+            await update.message.reply_text("Пожалуйста, оцените блок ответов от 1 до 5:")
+            context.user_data['awaiting_answer_block'] = True
+        else:
+            # Для открытых вопросов сразу переходим к следующему вопросу
+            try:
+                await save_evaluation_to_db(update, context)
+                context.user_data['current_question'] += 1  # Переходим к следующему вопросу
+                context.user_data['awaiting_comment'] = False  # Сбрасываем флаг комментария
+                await send_next_question(update, context)  # Отправляем следующий вопрос
+            except Exception as e:
+                await update.message.reply_text(f"Ошибка при сохранении данных: {str(e)}")
+
+# Функция для обработки оценки блока ответов
+async def handle_answer_block_evaluation(update, context):
+    """Обрабатываем оценку блока ответов и запрашиваем комментарий к блоку"""
+    if context.user_data.get('awaiting_answer_block', False):
+        # Получаем оценку от пользователя
+        rating = int(update.callback_query.data)
+
+        # Сохраняем оценку блока ответов
+        current_question_index = context.user_data.get('current_question', 0)
+        context.user_data['evaluations'][-1]['answer_block_rating'] = rating
+
+        # Переходим к запросу комментария к блоку ответов
+        await update.callback_query.message.reply_text("Пожалуйста, введите комментарий к блоку ответов:")
+        context.user_data['awaiting_answer_block_comment'] = True
+
+# Функция для обработки комментария к блоку ответов и перехода к следующему вопросу
+async def handle_answer_block_comment(update, context):
+    """Обрабатываем комментарий к блоку ответов и переходим к следующему вопросу"""
+    if context.user_data.get('awaiting_answer_block_comment', False):
+        # Получаем комментарий от пользователя
+        comment = update.message.text
+
+        # Сохраняем комментарий для блока ответов
+        context.user_data['evaluations'][-1]['answer_block_comment'] = comment
+
         # Попробуем сохранить оценку и комментарий в базу данных
         try:
             await save_evaluation_to_db(update, context)
             context.user_data['current_question'] += 1  # Переходим к следующему вопросу
-            context.user_data['awaiting_comment'] = False  # Сбрасываем флаг комментария
+            context.user_data['awaiting_comment'] = False  # Сбрасываем флаги
+            context.user_data['awaiting_answer_block'] = False
+            context.user_data['awaiting_answer_block_comment'] = False
             await send_next_question(update, context)  # Отправляем следующий вопрос
         except Exception as e:
             await update.message.reply_text(f"Ошибка при сохранении данных: {str(e)}")
-    else:
-        await update.message.reply_text("Оцените вопрос перед добавлением комментария.")
 
-
-# Функция для сохранения данных в базу
+# Обновляем функцию для сохранения данных в базе данных
 async def save_evaluation_to_db(update, context):
-    """Сохраняем текущий вопрос, оценку и комментарий в базу данных"""
+    """Сохраняем текущий вопрос, оценки и комментарии в базу данных"""
     try:
         evaluation = context.user_data['evaluations'][-1]
         question_text = evaluation['question']
-        rating = evaluation['rating']
-        comment = evaluation.get('comment', "")
+        question_rating = evaluation['rating']
+        question_comment = evaluation.get('comment', "")
+        answer_block_rating = evaluation.get('answer_block_rating', None)
+        answer_block_comment = evaluation.get('answer_block_comment', "")
 
         question_type_id = 1 if context.user_data['is_open'] == 'Открытые вопросы' else 2
         technology_id = context.user_data['technology']
@@ -206,8 +247,12 @@ async def save_evaluation_to_db(update, context):
             # Добавляем вопрос и сохраняем его идентификатор
             question_id = add_question(conn, question_text, question_type_id, technology_id, difficulty_id)
 
-            # Добавляем оценку
-            add_assessment(conn, update.effective_user.id, question_id, rating, comment)
+            # Добавляем оценку вопроса
+            add_assessment(conn, update.effective_user.id, question_id, question_rating, question_comment)
+
+            # Если есть оценка блока ответов, сохраняем её
+            if answer_block_rating:
+                add_assessment(conn, update.effective_user.id, question_id, answer_block_rating, answer_block_comment, is_answer_block=True)
 
             # Закрываем соединение с базой данных
             conn.close()

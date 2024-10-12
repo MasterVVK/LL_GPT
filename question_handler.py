@@ -242,8 +242,8 @@ async def handle_comment(update, context):
 async def handle_answer_block_evaluation(update, context):
     """Обрабатываем оценку блока ответов и запрашиваем комментарий к блоку"""
     if context.user_data.get('awaiting_answer_block', False):
-        # Получаем оценку от пользователя
-        rating = int(update.callback_query.data)
+        # Получаем оценку от пользователя (извлекаем только числовую часть)
+        rating = int(update.callback_query.data.split("_")[2])
 
         # Сохраняем оценку блока ответов
         current_question_index = context.user_data.get('current_question', 0)
